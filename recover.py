@@ -331,7 +331,7 @@ def main():
     verify_image(image)
     expected_mac = args.router_mac.lower() if args.router_mac else None
     if expected_mac and not re.fullmatch(r"[0-9a-f]{2}(:[0-9a-f]{2}){5}", expected_mac):
-        parser.error("--router-mac must have the form 00:11:22:33:44:55")
+        parser.error("--router-mac must contain six hexadecimal octets separated by colons")
     interface = args.interface
     details = subprocess.check_output(["ifconfig", interface], text=True)
     if "status: active" not in details:
