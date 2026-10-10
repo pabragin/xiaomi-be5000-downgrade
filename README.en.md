@@ -11,6 +11,30 @@ a guaranteed procedure for every BE5000.
 Python 3.8 or newer is required. The RD18 transfer was hardware-tested on
 macOS; Linux and Windows have only been checked at the code level so far.
 
+## Quick downgrade sequence
+
+This is the sequence that worked on one RD18. The helper serves firmware
+**1.0.53** on every recovery cycle below.
+
+1. Prepare the connection and start `recover.py` as described below. Connect
+   the cable to the router's first Ethernet port (LAN1).
+2. Power on the router while holding Reset. Release Reset when the LED starts
+   blinking yellow. Wait for `TFTP transfer complete` and 100% progress.
+3. If the LED is still off after the transfer, wait about **10 seconds** and
+   unplug the router.
+4. Enter Reset recovery again and wait for the 1.0.53 transfer to complete.
+   If the LED is still off, wait about **20 seconds after 100%** and unplug
+   the router again.
+5. Enter Reset recovery once more, let the full 1.0.53 transfer finish, and
+   leave the router powered on to boot. After a successful downgrade, the
+   status LED may not turn yellow immediately. Verify `romversion` through
+   the API below.
+
+Power interruptions after TFTP are a risky step from one personal attempt,
+not a guaranteed procedure: the router may still be checking or writing the
+image. It can fail to boot and require UART or a flash programmer. The sequence
+was inspired by [this forum thread](https://www.right.com.cn/forum/thread-8470335-1-1.html).
+
 Files: `recover.py` is the only program; [POST.md](POST.md) and
 [POST.en.md](POST.en.md) document the original attempt in Russian and English;
 [LOG_EXAMPLE.md](LOG_EXAMPLE.md) contains an anonymized log excerpt.
@@ -27,8 +51,8 @@ Download ahead of time with `python3 recover.py --download-only` (Windows:
 Clone this repository or download its ZIP from GitHub:
 
 ```sh
-git clone https://github.com/pabragin/xiaomi-be5000-recovery.git
-cd xiaomi-be5000-recovery
+git clone https://github.com/pabragin/xiaomi-be5000-downgrade.git
+cd xiaomi-be5000-downgrade
 ```
 
 Connect the computer directly to the **first Ethernet port (LAN1)** of the
@@ -76,7 +100,7 @@ adapter's usual IPv4 settings when finished. Windows cannot use the same
 macOS/Linux interface binding or automatic address setup in this script, so
 check its logs carefully.
 
-## 3. Enter recovery mode
+## 3. Enter recovery mode and verify
 
 Wait for both `TFTP listening` and `DHCP listening`. Remove power from the
 RD18. Hold Reset while reconnecting power; release it when the status LED
@@ -84,7 +108,7 @@ starts blinking yellow/orange. Look for `DHCP DISCOVER`, `TFTP RRQ`, progress
 to 100%, and `TFTP transfer complete`. Repeated DHCP requests without a
 completed transfer mean the router has not received the entire file.
 
-Normally, leave the router powered on after TFTP completes so it can verify
+After the final TFTP attempt, leave the router powered on so it can verify
 and install the image. Verify the result at `http://192.168.31.1/` or:
 
 ```sh
