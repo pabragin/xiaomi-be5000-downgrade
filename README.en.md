@@ -13,15 +13,17 @@ only. Python 3.8 or newer is required.
 This sequence follows a BE5000 owner's reported 1.0.88 → 1.0.53 downgrade on
 [4PDA](https://4pda.to/forum/index.php?showtopic=1088946&st=2240) and the
 [detailed BE5000 method report](https://www.right.com.cn/forum/thread-8470335-1-1.html).
-The latter author first upgraded from 1.0.87 to 1.0.91 and included LED
-observations and approximate timings.
-It interrupts two 1.0.91 writes to damage both system copies, then installs
-1.0.53 through stock recovery. Interrupting a flash write is risky and may
-require UART or a flash programmer.
+The original report's router was on 1.0.87, so its author first upgraded to
+1.0.91. In the case documented here, the router already ran 1.0.91, so the
+cleanup cycles started with that version. Both cases then use two interrupted
+1.0.91 writes followed by a 1.0.53 install through stock recovery. The original
+report also includes LED observations and approximate timings. Interrupting a
+flash write is risky and may require UART or a flash programmer.
 
 1. Prepare the computer and cable as described below. Connect to the router's
    **first Ethernet port (LAN1)**. If the router runs an older version, first
-   update it normally to official 1.0.91. Then choose one file-serving option:
+   update it normally to official 1.0.91. In the documented case, the router
+   already ran 1.0.91. Then choose one file-serving option:
    `recover.py` (macOS/Linux/Windows) or Xiaomi's official
    [MiWiFi Repair Tool](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/tools/MIWIFIRepairTool.x86.zip)
    (Windows). Do not run both at once. If the router runs 1.0.91, select image
