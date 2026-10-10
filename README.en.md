@@ -10,25 +10,36 @@ only. Python 3.8 or newer is required.
 
 ## Quick downgrade sequence
 
-This sequence follows the reported BE5000 1.0.91 case and [the forum method](https://www.right.com.cn/forum/thread-8470335-1-1.html).
-It intentionally interrupts firmware writes to clear both system copies.
-This can leave the router unbootable and require UART or a flash programmer.
+This sequence follows a BE5000 owner's reported 1.0.88 → 1.0.53 downgrade on
+[4PDA](https://4pda.to/forum/index.php?showtopic=1088946&st=2240) and the
+[detailed BE5000 method report](https://www.right.com.cn/forum/thread-8470335-1-1.html).
+The latter author first upgraded from 1.0.87 to 1.0.91 and included LED
+observations and approximate timings.
+It interrupts two 1.0.91 writes to damage both system copies, then installs
+1.0.53 through stock recovery. Interrupting a flash write is risky and may
+require UART or a flash programmer.
 
 1. Prepare the computer and cable as described below. Connect to the router's
-   **first Ethernet port (LAN1)**. If the BE5000 currently runs 1.0.91, start
-   the helper with that same image:
-   `sudo python3 recover.py --interface INTERFACE --firmware 1.0.91`.
-2. Hold Reset while powering on; release it when the LED starts blinking
-   yellow. Wait for 100% and `TFTP transfer complete`.
-3. After the 1.0.91 transfer reaches 100%, wait about **10 seconds** and
-   unplug the router. Start Reset recovery again with the 1.0.91 image and
-   wait for 100%.
-4. After this second complete transfer, wait about **20 seconds** and unplug
-   the router. The timings are approximate; this method aims to clear both
-   system copies.
-5. Now stop the server and restart it with `--firmware 1.0.53`. Enter Reset
-   recovery, wait for 100%, and let installation finish and the router boot.
-   Verify `romversion: 1.0.53` through the API.
+   **first Ethernet port (LAN1)**. If the router runs an older version, first
+   update it normally to official 1.0.91. Then choose one file-serving option:
+   `recover.py` (macOS/Linux/Windows) or Xiaomi's official
+   [MiWiFi Repair Tool](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/tools/MIWIFIRepairTool.x86.zip)
+   (Windows). Do not run both at once. If the router runs 1.0.91, select image
+   **1.0.91**.
+2. Start the selected server/tool and choose the 1.0.91 image. Hold Reset while
+   powering on; release it when the LED starts blinking yellow. Wait for 100%
+   transfer. With `recover.py`, also wait for `TFTP transfer complete`.
+3. The BE5000 report says to unplug about **20 seconds** after the first
+   transfer. Enter Reset recovery again with the same 1.0.91 image and wait for
+   100%.
+4. After the second transfer, the author unplugged about **10 seconds** later.
+   These timings are approximate, not fixed timers.
+5. End the current attempt and switch to the 1.0.53 image. With `recover.py`,
+   stop and restart the server using
+   `sudo python3 recover.py --interface INTERFACE --firmware 1.0.53`; in
+   MiWiFi Repair Tool, select 1.0.53. Enter Reset recovery, wait for 100%, and
+   let installation finish and the router boot. Verify `romversion: 1.0.53`
+   through the API.
 6. If the LED turns steady yellow immediately after the **1.0.53** transfer
    reaches 100%, system partition cleanup likely did not finish. Return to
    steps 2–4 with the 1.0.91 image, then repeat step 5.
@@ -36,6 +47,11 @@ This can leave the router unbootable and require UART or a flash programmer.
 A 100% TFTP transfer confirms only that the file was sent. It does not confirm
 that partitions were cleared or firmware was installed. LED behavior and power
 interruption timings are observations from specific attempts, not guarantees.
+
+MiWiFi Repair Tool is Xiaomi's Windows recovery utility and serves the recovery
+file itself. On macOS and Linux, use `recover.py` or another DHCP/TFTP server
+configured for the recovery bootloader. Both options use the same official
+firmware images and the same recovery sequence.
 
 Files: `recover.py` is the only program; [POST.md](POST.md) and
 [POST.en.md](POST.en.md) document the original attempt in Russian and English;
@@ -51,6 +67,17 @@ The script verifies each image's pinned size and SHA-256. Download both first wi
 `python3` with `py -3`). Internet is not needed during recovery.
 
 ## 1. Prepare the connection
+
+### Alternative: Xiaomi MiWiFi Repair Tool
+
+Download [Xiaomi's official MiWiFi Repair Tool](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/tools/MIWIFIRepairTool.x86.zip)
+and extract it on Windows. Connect the computer to LAN1, set the Ethernet
+adapter to `192.168.31.100/24`, and disable Wi-Fi. Select the required official
+image in the tool and start recovery. Select 1.0.91 for both cleanup cycles,
+then select 1.0.53 in a separate attempt. The tool replaces `recover.py` only
+as the file-serving method. This tool and procedure are described in the linked
+forum reports, but this combination has not been independently tested by this
+repository's author.
 
 Clone this repository or download its ZIP from GitHub:
 
