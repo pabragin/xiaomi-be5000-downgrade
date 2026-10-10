@@ -20,17 +20,18 @@ This can leave the router unbootable and require UART or a flash programmer.
    `sudo python3 recover.py --interface INTERFACE --firmware 1.0.91`.
 2. Hold Reset while powering on; release it when the LED starts blinking
    yellow. Wait for 100% and `TFTP transfer complete`.
-3. During the **1.0.91** cleanup cycle, wait about **10 seconds** after the
-   full transfer and unplug the router. Enter recovery again, serve 1.0.91,
-   wait for 100%, then wait about **20 seconds** and unplug again. These times
-   are approximate.
-4. Repeat the 1.0.91 recovery cycle as needed. If, after a 1.0.53 transfer
-   reaches 100%, the LED immediately turns steady yellow, the system partition
-   cleanup likely did not finish; repeat the cleanup cycles in steps 2–4 with
-   the 1.0.91 image.
-5. Once cleanup is complete, stop the server and restart it with
-   `--firmware 1.0.53`. Enter Reset recovery and let the full transfer and
-   installation finish. Verify `romversion: 1.0.53` through the API.
+3. After the 1.0.91 transfer reaches 100%, wait about **10 seconds** and
+   unplug the router. Start Reset recovery again with the 1.0.91 image and
+   wait for 100%.
+4. After this second complete transfer, wait about **20 seconds** and unplug
+   the router. The timings are approximate; this method aims to clear both
+   system copies.
+5. Now stop the server and restart it with `--firmware 1.0.53`. Enter Reset
+   recovery, wait for 100%, and let installation finish and the router boot.
+   Verify `romversion: 1.0.53` through the API.
+6. If the LED turns steady yellow immediately after the **1.0.53** transfer
+   reaches 100%, system partition cleanup likely did not finish. Return to
+   steps 2–4 with the 1.0.91 image, then repeat step 5.
 
 A 100% TFTP transfer confirms only that the file was sent. It does not confirm
 that partitions were cleared or firmware was installed. LED behavior and power
