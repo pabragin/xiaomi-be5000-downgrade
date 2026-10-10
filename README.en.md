@@ -27,8 +27,8 @@ Download ahead of time with `python3 recover.py --download-only` (Windows:
 Clone this repository or download its ZIP from GitHub:
 
 ```sh
-git clone https://github.com/pabragin/be5000-rd18-recovery.git
-cd be5000-rd18-recovery
+git clone https://github.com/pabragin/xiaomi-be5000-recovery.git
+cd xiaomi-be5000-recovery
 ```
 
 Connect the computer directly to the **first Ethernet port (LAN1)** of the

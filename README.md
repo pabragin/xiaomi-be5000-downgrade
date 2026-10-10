@@ -33,8 +33,8 @@ English instructions: [README.en.md](README.en.md).
 1. Скачайте репозиторий и перейдите в его папку:
 
    ```sh
-   git clone https://github.com/pabragin/be5000-rd18-recovery.git
-   cd be5000-rd18-recovery
+   git clone https://github.com/pabragin/xiaomi-be5000-recovery.git
+   cd xiaomi-be5000-recovery
    ```
 
    На Windows можно вместо `git clone` скачать ZIP через кнопку **Code** на
