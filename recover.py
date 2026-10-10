@@ -2,7 +2,7 @@
 """Serve a Xiaomi RD18 1.0.53 recovery image over isolated Ethernet DHCP/TFTP.
 
 This only transfers the signed image. The router's bootloader decides whether
-to accept and flash it. Run on macOS with: sudo python3 recover.py --interface en8
+to accept and flash it. See README.md for macOS, Linux, and Windows setup.
 """
 
 import argparse
@@ -15,8 +15,10 @@ import signal
 import socket
 import struct
 import subprocess
+import tempfile
 import threading
 import time
+import urllib.request
 from pathlib import Path
 
 
@@ -24,10 +26,12 @@ SERVER_IP = "192.168.31.100"
 CLIENT_IP = "192.168.31.111"
 MASK = "255.255.255.0"
 FILENAME = "miwifi_rd18_firmware_6c571_1.0.53.bin"
+FIRMWARE_URL = "https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/rom/rd18/" + FILENAME
 SHA256 = "cdc567abd5b9d4ff10adb02ee9592575640e5607135a4588f05e7bdc2cab17d0"
 IMAGE_SIZE = 31069192
+SYSTEM = platform.system()
 IP_BOUND_IF = 25  # macOS <netinet/in.h>
-IP_PKTINFO = 26   # macOS <netinet/in.h>
+IP_PKTINFO = 26 if SYSTEM == "Darwin" else 8  # macOS / Linux
 MAGIC = b"\x63\x82\x53\x63"
 STOP = threading.Event()
 
@@ -41,7 +45,25 @@ def ip_bytes(address):
 
 
 def bind_interface(sock, interface):
-    sock.setsockopt(socket.IPPROTO_IP, IP_BOUND_IF, socket.if_nametoindex(interface))
+    if SYSTEM == "Darwin":
+        sock.setsockopt(socket.IPPROTO_IP, IP_BOUND_IF, socket.if_nametoindex(interface))
+    elif SYSTEM == "Linux":
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, interface.encode() + b"\0")
+
+
+def send_dhcp_reply(sock, interface, packet, destination):
+    if SYSTEM == "Windows":
+        # Windows Python sockets have no sendmsg(). Use the isolated Ethernet
+        # link with a static SERVER_IP so the route selects that interface.
+        sock.sendto(packet, (destination, 68))
+        return
+    packet_info = struct.pack(
+        "=I4s4s", socket.if_nametoindex(interface), ip_bytes(SERVER_IP), b"\0" * 4
+    )
+    sock.sendmsg(
+        [packet], [(socket.IPPROTO_IP, IP_PKTINFO, packet_info)],
+        0, (destination, 68),
+    )
 
 
 def parse_options(data):
@@ -133,28 +155,15 @@ def dhcp_server(interface, expected_mac):
                 log(f"DHCP type {kind.hex()} from {mac}; ignored")
                 continue
             log(f"DHCP {label} {CLIENT_IP} to {mac} ({source[0]})")
-            # The socket must receive on 0.0.0.0 for broadcasts. Without
-            # IP_PKTINFO macOS sends from the interface's primary address
-            # (.62 here), which differs from the advertised server ID (.100).
-            packet_info = struct.pack(
-                "=I4s4s", socket.if_nametoindex(interface), ip_bytes(SERVER_IP), b"\0" * 4
-            )
+            # Receive broadcasts on 0.0.0.0, then send from the recovery
+            # interface where the platform supports source-address control.
+            reply = dhcp_reply(data, response_kind)
             try:
-                sock.sendmsg(
-                    [dhcp_reply(data, response_kind)],
-                    [(socket.IPPROTO_IP, IP_PKTINFO, packet_info)],
-                    0,
-                    ("255.255.255.255", 68),
-                )
+                send_dhcp_reply(sock, interface, reply, "255.255.255.255")
             except OSError as error:
                 if error.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH):
                     try:
-                        sock.sendmsg(
-                            [dhcp_reply(data, response_kind)],
-                            [(socket.IPPROTO_IP, IP_PKTINFO, packet_info)],
-                            0,
-                            ("192.168.31.255", 68),
-                        )
+                        send_dhcp_reply(sock, interface, reply, "192.168.31.255")
                         log(f"DHCP reply sent via {interface} subnet broadcast")
                     except OSError as fallback_error:
                         log(f"Ethernet route not ready ({fallback_error}); waiting for the next DHCP request")
@@ -299,13 +308,52 @@ def tftp_server(interface, image):
 
 
 def ensure_alias(interface):
-    output = subprocess.check_output(["ifconfig", interface], text=True)
-    if re.search(r"\binet " + re.escape(SERVER_IP) + r"\b", output):
-        log(f"{SERVER_IP} already assigned to {interface}; leaving it in place on exit")
+    if SYSTEM == "Windows":
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.bind((SERVER_IP, 0))
+        except OSError as error:
+            raise SystemExit(
+                f"Set Ethernet adapter '{interface}' to static {SERVER_IP}/24 before starting: {error}"
+            ) from error
+        finally:
+            probe.close()
+        log(f"Using manually configured {SERVER_IP}/24 on {interface}")
         return False
-    subprocess.check_call(["ifconfig", interface, "alias", SERVER_IP, "netmask", MASK])
-    log(f"Added temporary {SERVER_IP}/24 alias on {interface}")
+    if SYSTEM == "Darwin":
+        output = subprocess.check_output(["ifconfig", interface], text=True)
+        if re.search(r"\binet " + re.escape(SERVER_IP) + r"\b", output):
+            log(f"{SERVER_IP} already assigned to {interface}; leaving it in place on exit")
+            return False
+        subprocess.check_call(["ifconfig", interface, "alias", SERVER_IP, "netmask", MASK])
+    else:
+        output = subprocess.check_output(["ip", "-o", "-4", "addr", "show", "dev", interface], text=True)
+        if f"inet {SERVER_IP}/24" in output:
+            log(f"{SERVER_IP}/24 already assigned to {interface}; leaving it in place on exit")
+            return False
+        subprocess.check_call(["ip", "address", "add", f"{SERVER_IP}/24", "dev", interface])
+    log(f"Added temporary {SERVER_IP}/24 address on {interface}")
     return True
+
+
+def remove_alias(interface):
+    if SYSTEM == "Darwin":
+        subprocess.check_call(["ifconfig", interface, "-alias", SERVER_IP])
+    elif SYSTEM == "Linux":
+        subprocess.check_call(["ip", "address", "del", f"{SERVER_IP}/24", "dev", interface])
+    log(f"Removed temporary {SERVER_IP} address")
+
+
+def check_link(interface):
+    if SYSTEM == "Darwin":
+        details = subprocess.check_output(["ifconfig", interface], text=True)
+        if "status: active" not in details:
+            log(f"{interface} has no Ethernet link yet; waiting for the router to power on")
+    elif SYSTEM == "Linux":
+        socket.if_nametoindex(interface)
+        carrier = Path("/sys/class/net") / interface / "carrier"
+        if carrier.exists() and carrier.read_text().strip() != "1":
+            log(f"{interface} has no Ethernet link yet; waiting for the router to power on")
 
 
 def verify_image(image):
@@ -318,24 +366,54 @@ def verify_image(image):
     log(f"Verified RD18 1.0.53 image: {image.stat().st_size:,} bytes, SHA-256 {SHA256}")
 
 
+def download_image(image):
+    log(f"Firmware not found; downloading official RD18 1.0.53 image from {FIRMWARE_URL}")
+    temporary = None
+    try:
+        with urllib.request.urlopen(FIRMWARE_URL, timeout=30) as response:
+            with tempfile.NamedTemporaryFile(dir=image.parent, prefix=FILENAME + ".", suffix=".part", delete=False) as output:
+                temporary = Path(output.name)
+                digest = hashlib.sha256()
+                size = 0
+                while chunk := response.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > IMAGE_SIZE:
+                        raise ValueError("download exceeds expected firmware size")
+                    digest.update(chunk)
+                    output.write(chunk)
+        if size != IMAGE_SIZE or digest.hexdigest() != SHA256:
+            raise ValueError("downloaded firmware size or SHA-256 does not match")
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, image)
+        log("Official firmware downloaded and verified")
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--interface", required=True, help="Ethernet interface connected directly to BE5000, e.g. en8")
+    parser.add_argument("--interface", help="Ethernet interface connected directly to BE5000")
     parser.add_argument("--router-mac", help="Optional recovery-mode MAC if automatic detection fails")
+    parser.add_argument("--download-only", action="store_true", help="Download and verify the official image, then exit")
     args = parser.parse_args()
-    if platform.system() != "Darwin":
-        raise SystemExit("This helper is for macOS")
-    if os.geteuid() != 0:
-        raise SystemExit("Run with sudo so DHCP/TFTP can use UDP ports 67 and 69")
+    if SYSTEM not in ("Darwin", "Linux", "Windows"):
+        raise SystemExit(f"Unsupported operating system: {SYSTEM}")
     image = Path(__file__).resolve().parent / FILENAME
+    if not image.exists():
+        download_image(image)
     verify_image(image)
+    if args.download_only:
+        return
+    if not args.interface:
+        parser.error("--interface is required unless --download-only is used")
+    if SYSTEM != "Windows" and os.geteuid() != 0:
+        raise SystemExit("Run with sudo so DHCP/TFTP can use UDP ports 67 and 69")
     expected_mac = args.router_mac.lower() if args.router_mac else None
     if expected_mac and not re.fullmatch(r"[0-9a-f]{2}(:[0-9a-f]{2}){5}", expected_mac):
         parser.error("--router-mac must contain six hexadecimal octets separated by colons")
     interface = args.interface
-    details = subprocess.check_output(["ifconfig", interface], text=True)
-    if "status: active" not in details:
-        log(f"{interface} has no Ethernet link yet; waiting for the router to power on")
+    check_link(interface)
     added = ensure_alias(interface)
     for signum in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, lambda _s, _f: STOP.set())
@@ -350,8 +428,7 @@ def main():
     finally:
         STOP.set()
         if added:
-            subprocess.call(["ifconfig", interface, "-alias", SERVER_IP])
-            log(f"Removed temporary {SERVER_IP} alias")
+            remove_alias(interface)
 
 
 if __name__ == "__main__":
