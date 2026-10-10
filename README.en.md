@@ -20,14 +20,12 @@ cleanup cycles started with that version. Both cases then use two interrupted
 report also includes LED observations and approximate timings. Interrupting a
 flash write is risky and may require UART or a flash programmer.
 
-1. Prepare the computer and cable as described below. Connect to the router's
-   **first Ethernet port (LAN1)**. If the router runs an older version, first
-   update it normally to official 1.0.91. In the documented case, the router
-   already ran 1.0.91. Then choose one file-serving option:
+1. This sequence describes downgrading a router that already runs **1.0.91**.
+   Prepare the computer and cable as described below, connect to the router's
+   **first Ethernet port (LAN1)**, and choose one file-serving option:
    `recover.py` (macOS/Linux/Windows) or Xiaomi's official
    [MiWiFi Repair Tool](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/tools/MIWIFIRepairTool.x86.zip)
-   (Windows). Do not run both at once. If the router runs 1.0.91, select image
-   **1.0.91**.
+   (Windows). Do not run both at once. Select image **1.0.91**.
 2. Start the selected server/tool and choose the 1.0.91 image. Hold Reset while
    powering on; release it when the LED starts blinking yellow. Wait for 100%
    transfer. With `recover.py`, also wait for `TFTP transfer complete`.
