@@ -29,11 +29,12 @@ flash write is risky and may require UART or a flash programmer.
 2. Start the selected server/tool and choose the 1.0.91 image. Hold Reset while
    powering on; release it when the LED starts blinking yellow. Wait for 100%
    transfer. With `recover.py`, also wait for `TFTP transfer complete`.
-3. The BE5000 report says to unplug about **20 seconds** after the first
-   transfer. Enter Reset recovery again with the same 1.0.91 image and wait for
+3. After the first 1.0.91 transfer, wait about **10 seconds** and unplug the
+   router. Enter Reset recovery again with the same 1.0.91 image and wait for
    100%.
-4. After the second transfer, the author unplugged about **10 seconds** later.
-   These timings are approximate, not fixed timers.
+4. After the second transfer, wait about **20 seconds** and unplug it again.
+   These are the timings from our attempt; they are approximate and may differ
+   from other reports.
 5. End the current attempt and switch to the 1.0.53 image. With `recover.py`,
    stop and restart the server using
    `sudo python3 recover.py --interface INTERFACE --firmware 1.0.53`; in
@@ -46,7 +47,7 @@ flash write is risky and may require UART or a flash programmer.
 
 A 100% TFTP transfer confirms only that the file was sent. It does not confirm
 that partitions were cleared or firmware was installed. LED behavior and power
-interruption timings are observations from specific attempts, not guarantees.
+interruption timings are observations from our case, not guarantees.
 
 MiWiFi Repair Tool is Xiaomi's Windows recovery utility and serves the recovery
 file itself. On macOS and Linux, use `recover.py` or another DHCP/TFTP server
