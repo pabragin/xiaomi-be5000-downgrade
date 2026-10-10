@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serve a Xiaomi RD18 1.0.53 recovery image over isolated Ethernet DHCP/TFTP.
+"""Serve a Xiaomi BE5000 1.0.53 recovery image over isolated Ethernet DHCP/TFTP.
 
 This only transfers the signed image. The router's bootloader decides whether
 to accept and flash it. See README.md for macOS, Linux, and Windows setup.
@@ -140,7 +140,7 @@ def dhcp_server(interface, expected_mac):
             bootfile = data[108:236].split(b"\0", 1)[0]
             if recovery_mac is None:
                 if bootfile != b"tclinux.bin":
-                    log(f"DHCP from {mac} without RD18 recovery bootfile; ignored")
+                    log(f"DHCP from {mac} without BE5000 recovery bootfile; ignored")
                     continue
                 recovery_mac = mac
                 log(f"Recovery client locked to {recovery_mac}")
@@ -295,7 +295,7 @@ def tftp_server(interface, image):
                 continue
             log(f"TFTP RRQ {name!r} from {peer[0]} options={options}")
             if not permitted_filename(name):
-                log("TFTP filename not recognized for RD18; no image sent")
+                log("TFTP filename not recognized for BE5000; no image sent")
                 send_error(sock, peer, "Unexpected recovery filename")
                 continue
             if active_transfer is not None:
@@ -363,11 +363,11 @@ def verify_image(image):
             digest.update(chunk)
     if digest.hexdigest() != SHA256 or image.stat().st_size != IMAGE_SIZE:
         raise SystemExit("Firmware hash or size mismatch; refusing to serve it")
-    log(f"Verified RD18 1.0.53 image: {image.stat().st_size:,} bytes, SHA-256 {SHA256}")
+    log(f"Verified Xiaomi BE5000 1.0.53 image: {image.stat().st_size:,} bytes, SHA-256 {SHA256}")
 
 
 def download_image(image):
-    log(f"Firmware not found; downloading official RD18 1.0.53 image from {FIRMWARE_URL}")
+    log(f"Firmware not found; downloading official Xiaomi BE5000 1.0.53 image from {FIRMWARE_URL}")
     temporary = None
     try:
         with urllib.request.urlopen(FIRMWARE_URL, timeout=30) as response:

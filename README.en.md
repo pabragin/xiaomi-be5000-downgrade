@@ -1,19 +1,19 @@
-# Xiaomi BE5000 (RD18): stock 1.0.53 recovery over Ethernet
+# Xiaomi BE5000: stock 1.0.53 recovery over Ethernet
 
 Русская инструкция: [README.md](README.md).
 
 This repository contains a Python DHCP/TFTP recovery server for **macOS,
-Linux, and Windows**. It serves Xiaomi's signed RD18 firmware 1.0.53 to the
+Linux, and Windows**. It serves Xiaomi's signed BE5000 firmware 1.0.53 to the
 router's recovery bootloader. The script does not write flash directly or
 bypass rollback checks. A completed TFTP transfer alone does not prove that
 the router installed 1.0.53. The documented downgrade is one real case, not
 a guaranteed procedure for every BE5000.
-Python 3.8 or newer is required. The RD18 transfer was hardware-tested on
+Python 3.8 or newer is required. The BE5000 transfer was hardware-tested on
 macOS; Linux and Windows have only been checked at the code level so far.
 
 ## Quick downgrade sequence
 
-This is the sequence that worked on one RD18. The helper serves firmware
+This is the sequence that worked on one Xiaomi BE5000. The helper serves firmware
 **1.0.53** on every recovery cycle below.
 
 1. Prepare the connection and start `recover.py` as described below. Connect
@@ -56,7 +56,7 @@ cd xiaomi-be5000-downgrade
 ```
 
 Connect the computer directly to the **first Ethernet port (LAN1)** of the
-RD18. This is the port used in the successful attempt. Disconnect the router's
+Xiaomi BE5000. This is the port used in the successful attempt. Disconnect the router's
 WAN cable and other clients. Recovery uses Ethernet, not the router's Wi-Fi.
 Make sure no other DHCP or TFTP server is using UDP ports 67 or 69. On
 macOS/Linux, inspect them with `sudo lsof -nP -iUDP:67 -iUDP:69`.
@@ -103,7 +103,7 @@ check its logs carefully.
 ## 3. Enter recovery mode and verify
 
 Wait for both `TFTP listening` and `DHCP listening`. Remove power from the
-RD18. Hold Reset while reconnecting power; release it when the status LED
+router. Hold Reset while reconnecting power; release it when the status LED
 starts blinking yellow/orange. Look for `DHCP DISCOVER`, `TFTP RRQ`, progress
 to 100%, and `TFTP transfer complete`. Repeated DHCP requests without a
 completed transfer mean the router has not received the entire file.
@@ -115,7 +115,7 @@ and install the image. Verify the result at `http://192.168.31.1/` or:
 curl -fsS 'http://192.168.31.1/cgi-bin/luci/api/xqsystem/init_info'
 ```
 
-Look for `hardware: RD18` and `romversion: 1.0.53`. Stop the server with
+Verify `romversion: 1.0.53`. The firmware may report its internal platform identifier as `hardware: RD18`. Stop the server with
 `Ctrl+C`.
 
 The script recognizes the recovery bootloader by its DHCP `tclinux.bin`

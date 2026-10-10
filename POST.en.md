@@ -1,8 +1,8 @@
-# Xiaomi BE5000 (RD18): my 1.0.91 to 1.0.53 downgrade over Mac Ethernet
+# Xiaomi BE5000: my 1.0.91 to 1.0.53 downgrade over Mac Ethernet
 
 Русская версия: [POST.md](POST.md).
 
-I returned my Xiaomi BE5000 (RD18) from stock firmware 1.0.91 to 1.0.53
+I returned my Xiaomi BE5000 from stock firmware 1.0.91 to 1.0.53
 without a USB-to-TTL adapter. This is a report of **one device**, not a
 guaranteed downgrade procedure: the bootloader decides whether it accepts
 an older signed image.
@@ -31,7 +31,7 @@ LED remained off. I interrupted power several times in that state, roughly
 10 seconds after one completed transfer and about 20 seconds after another.
 Then I ran Reset recovery with 1.0.53 again and let the router boot. Its local
 API at `http://192.168.31.1/cgi-bin/luci/api/xqsystem/init_info` reported
-`hardware: RD18` and `romversion: 1.0.53`.
+`romversion: 1.0.53` (the internal `hardware` field may report `RD18`).
 
 Those timings and the number of attempts were approximate. An unlit LED
 does not show whether the router is checking or writing flash. Cutting power

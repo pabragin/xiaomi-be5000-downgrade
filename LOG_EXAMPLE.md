@@ -1,15 +1,15 @@
 # Обезличенные фрагменты журнала / Anonymized log excerpts
 
-Это фрагменты реальной сессии восстановления RD18. MAC-адреса заменены на
+Это фрагменты реальной сессии восстановления Xiaomi BE5000. MAC-адреса заменены на
 `[MAC скрыт]`; интервалы между попытками сокращены. Последняя строка API
 показывает результат проверки после загрузки роутера.
 
-These are excerpts from the actual RD18 recovery session. MAC addresses were
+These are excerpts from the actual Xiaomi BE5000 recovery session. MAC addresses were
 redacted, and the gaps between attempts were shortened. The final API fields
 show the version verified after the router booted.
 
 ```text
-01:11:48 Verified RD18 1.0.53 image: 31,069,192 bytes, SHA-256 cdc567abd5b9d4ff10adb02ee9592575640e5607135a4588f05e7bdc2cab17d0
+01:11:48 Verified Xiaomi BE5000 1.0.53 image: 31,069,192 bytes, SHA-256 cdc567abd5b9d4ff10adb02ee9592575640e5607135a4588f05e7bdc2cab17d0
 01:11:48 Added temporary 192.168.31.100/24 alias on en8
 01:11:48 TFTP listening on 192.168.31.100:69
 01:11:48 DHCP listening on en8:67; offering 192.168.31.111
@@ -35,6 +35,6 @@ show the version verified after the router booted.
 После окончательной загрузки проверка локального API показала:
 
 ```text
-hardware: RD18
+hardware: RD18 (internal platform identifier)
 romversion: 1.0.53
 ```
