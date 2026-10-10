@@ -1,10 +1,10 @@
 # Обезличенные фрагменты журнала / Anonymized log excerpts
 
-Это фрагменты реальной сессии восстановления Xiaomi BE5000. MAC-адреса заменены на
+Это фрагменты одной из прежних попыток восстановления Xiaomi BE5000 с образом 1.0.53, а не полный двухэтапный процесс из инструкции. MAC-адреса заменены на
 `[MAC скрыт]`; интервалы между попытками сокращены. Последняя строка API
 показывает результат проверки после загрузки роутера.
 
-These are excerpts from the actual Xiaomi BE5000 recovery session. MAC addresses were
+These are excerpts from an earlier Xiaomi BE5000 recovery attempt using the 1.0.53 image, not the complete two-stage process in the guide. MAC addresses were
 redacted, and the gaps between attempts were shortened. The final API fields
 show the version verified after the router booted.
 

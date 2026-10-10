@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serve a Xiaomi BE5000 1.0.53 recovery image over isolated Ethernet DHCP/TFTP.
+"""Serve a Xiaomi BE5000 stock recovery image over isolated Ethernet DHCP/TFTP.
 
 This only transfers the signed image. The router's bootloader decides whether
 to accept and flash it. See README.md for macOS, Linux, and Windows setup.
@@ -25,10 +25,19 @@ from pathlib import Path
 SERVER_IP = "192.168.31.100"
 CLIENT_IP = "192.168.31.111"
 MASK = "255.255.255.0"
-FILENAME = "miwifi_rd18_firmware_6c571_1.0.53.bin"
-FIRMWARE_URL = "https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/rom/rd18/" + FILENAME
-SHA256 = "cdc567abd5b9d4ff10adb02ee9592575640e5607135a4588f05e7bdc2cab17d0"
-IMAGE_SIZE = 31069192
+FIRMWARES = {
+    "1.0.53": {
+        "filename": "miwifi_rd18_firmware_6c571_1.0.53.bin",
+        "sha256": "cdc567abd5b9d4ff10adb02ee9592575640e5607135a4588f05e7bdc2cab17d0",
+        "size": 31069192,
+    },
+    "1.0.91": {
+        "filename": "miwifi_rd18_firmware_05f43_1.0.91.bin",
+        "sha256": "27968aaa3efa56e7a90a6ef7da7a51f392f612d49b1948d5de20a9304f3e417b",
+        "size": 30152712,
+    },
+}
+FIRMWARE_BASE_URL = "https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/rom/rd18/"
 SYSTEM = platform.system()
 IP_BOUND_IF = 25  # macOS <netinet/in.h>
 IP_PKTINFO = 26 if SYSTEM == "Darwin" else 8  # macOS / Linux
@@ -89,11 +98,11 @@ def parse_options(data):
     return result
 
 
-def dhcp_reply(request, kind):
+def dhcp_reply(request, kind, filename):
     # RFC 2131 BOOTP fixed header, followed by DHCP options.
     xid = request[4:8]
     chaddr = request[28:44]
-    bootfile = FILENAME.encode("ascii").ljust(128, b"\0")
+    bootfile = filename.encode("ascii").ljust(128, b"\0")
     fixed = struct.pack(
         "!BBBB4sHH4s4s4s4s16s64s128s",
         2, 1, 6, 0, xid, 0, 0x8000,
@@ -109,7 +118,7 @@ def dhcp_reply(request, kind):
         (6, ip_bytes(SERVER_IP)),         # DNS (not used in recovery)
         (51, struct.pack("!I", 600)),    # lease time
         (66, SERVER_IP.encode("ascii")), # TFTP server name
-        (67, FILENAME.encode("ascii")),  # bootfile name
+        (67, filename.encode("ascii")),  # bootfile name
     ):
         options.extend((code, len(value)))
         options.extend(value)
@@ -117,7 +126,7 @@ def dhcp_reply(request, kind):
     return fixed + bytes(options)
 
 
-def dhcp_server(interface, expected_mac):
+def dhcp_server(interface, expected_mac, filename):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -157,7 +166,7 @@ def dhcp_server(interface, expected_mac):
             log(f"DHCP {label} {CLIENT_IP} to {mac} ({source[0]})")
             # Receive broadcasts on 0.0.0.0, then send from the recovery
             # interface where the platform supports source-address control.
-            reply = dhcp_reply(data, response_kind)
+            reply = dhcp_reply(data, response_kind, filename)
             try:
                 send_dhcp_reply(sock, interface, reply, "255.255.255.255")
             except OSError as error:
@@ -187,8 +196,8 @@ def parse_rrq(packet):
     return name, options
 
 
-def permitted_filename(name):
-    return name == FILENAME or bool(re.fullmatch(r"C0A81F[0-9A-Fa-f]{2}\.img", name))
+def permitted_filename(name, filename):
+    return name == filename or bool(re.fullmatch(r"C0A81F[0-9A-Fa-f]{2}\.img", name))
 
 
 def send_error(sock, peer, message):
@@ -272,7 +281,7 @@ def exchange(sock, peer, packet, expected_ack, cancel=None):
     return False
 
 
-def tftp_server(interface, image):
+def tftp_server(interface, image, filename):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     bind_interface(sock, interface)
     sock.bind((SERVER_IP, 69))
@@ -294,7 +303,7 @@ def tftp_server(interface, image):
                 log(f"TFTP invalid request: {error}")
                 continue
             log(f"TFTP RRQ {name!r} from {peer[0]} options={options}")
-            if not permitted_filename(name):
+            if not permitted_filename(name, filename):
                 log("TFTP filename not recognized for BE5000; no image sent")
                 send_error(sock, peer, "Unexpected recovery filename")
                 continue
@@ -356,32 +365,33 @@ def check_link(interface):
             log(f"{interface} has no Ethernet link yet; waiting for the router to power on")
 
 
-def verify_image(image):
+def verify_image(image, firmware_version, firmware):
     digest = hashlib.sha256()
     with image.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
-    if digest.hexdigest() != SHA256 or image.stat().st_size != IMAGE_SIZE:
+    if digest.hexdigest() != firmware["sha256"] or image.stat().st_size != firmware["size"]:
         raise SystemExit("Firmware hash or size mismatch; refusing to serve it")
-    log(f"Verified Xiaomi BE5000 1.0.53 image: {image.stat().st_size:,} bytes, SHA-256 {SHA256}")
+    log(f"Verified Xiaomi BE5000 {firmware_version} image: {image.stat().st_size:,} bytes, SHA-256 {firmware['sha256']}")
 
 
-def download_image(image):
-    log(f"Firmware not found; downloading official Xiaomi BE5000 1.0.53 image from {FIRMWARE_URL}")
+def download_image(image, firmware_version, firmware):
+    url = FIRMWARE_BASE_URL + firmware["filename"]
+    log(f"Firmware not found; downloading official Xiaomi BE5000 {firmware_version} image from {url}")
     temporary = None
     try:
-        with urllib.request.urlopen(FIRMWARE_URL, timeout=30) as response:
-            with tempfile.NamedTemporaryFile(dir=image.parent, prefix=FILENAME + ".", suffix=".part", delete=False) as output:
+        with urllib.request.urlopen(url, timeout=30) as response:
+            with tempfile.NamedTemporaryFile(dir=image.parent, prefix=firmware["filename"] + ".", suffix=".part", delete=False) as output:
                 temporary = Path(output.name)
                 digest = hashlib.sha256()
                 size = 0
                 while chunk := response.read(1024 * 1024):
                     size += len(chunk)
-                    if size > IMAGE_SIZE:
+                    if size > firmware["size"]:
                         raise ValueError("download exceeds expected firmware size")
                     digest.update(chunk)
                     output.write(chunk)
-        if size != IMAGE_SIZE or digest.hexdigest() != SHA256:
+        if size != firmware["size"] or digest.hexdigest() != firmware["sha256"]:
             raise ValueError("downloaded firmware size or SHA-256 does not match")
         os.chmod(temporary, 0o644)
         os.replace(temporary, image)
@@ -395,14 +405,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--interface", help="Ethernet interface connected directly to BE5000")
     parser.add_argument("--router-mac", help="Optional recovery-mode MAC if automatic detection fails")
+    parser.add_argument("--firmware", choices=FIRMWARES, default="1.0.53", help="Stock firmware image to serve (default: 1.0.53)")
     parser.add_argument("--download-only", action="store_true", help="Download and verify the official image, then exit")
     args = parser.parse_args()
     if SYSTEM not in ("Darwin", "Linux", "Windows"):
         raise SystemExit(f"Unsupported operating system: {SYSTEM}")
-    image = Path(__file__).resolve().parent / FILENAME
+    firmware = FIRMWARES[args.firmware]
+    filename = firmware["filename"]
+    image = Path(__file__).resolve().parent / filename
     if not image.exists():
-        download_image(image)
-    verify_image(image)
+        download_image(image, args.firmware, firmware)
+    verify_image(image, args.firmware, firmware)
     if args.download_only:
         return
     if not args.interface:
@@ -422,9 +435,9 @@ def main():
         STOP.set()
     threading.excepthook = thread_error
     try:
-        dhcp_thread = threading.Thread(target=dhcp_server, args=(interface, expected_mac), name="DHCP", daemon=True)
+        dhcp_thread = threading.Thread(target=dhcp_server, args=(interface, expected_mac, filename), name="DHCP", daemon=True)
         dhcp_thread.start()
-        tftp_server(interface, image)
+        tftp_server(interface, image, filename)
     finally:
         STOP.set()
         if added:

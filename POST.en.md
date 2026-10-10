@@ -2,41 +2,30 @@
 
 Русская версия: [POST.md](POST.md).
 
-I returned my Xiaomi BE5000 from stock firmware 1.0.91 to 1.0.53
-without a USB-to-TTL adapter. This is a report of **one device**, not a
-guaranteed downgrade procedure: the bootloader decides whether it accepts
-an older signed image.
+My goal was to downgrade a Xiaomi BE5000 from 1.0.91 to 1.0.53 without a
+USB-to-TTL adapter. The recovery procedure has two stages: serve 1.0.91 and
+interrupt its write to clear both system copies, then serve 1.0.53. This is a
+risky method also described in [this forum thread](https://www.right.com.cn/forum/thread-8470335-1-1.html),
+not a guaranteed procedure.
 
-I used a Mac, a direct Ethernet cable to the router's **first port (LAN1)**,
-and the Python DHCP/TFTP helper in this repository. I disconnected the
-router's WAN cable and other clients. The script obtains the stock image
-[directly from Xiaomi](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/rom/rd18/miwifi_rd18_firmware_6c571_1.0.53.bin)
-when needed, then verifies its size (31,069,192 bytes) and SHA-256
-(`cdc567abd5b9d4ff10adb02ee9592575640e5607135a4588f05e7bdc2cab17d0`).
+Both original images are available directly from Xiaomi's CDN:
+[1.0.91](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/rom/rd18/miwifi_rd18_firmware_05f43_1.0.91.bin)
+and [1.0.53](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/rom/rd18/miwifi_rd18_firmware_6c571_1.0.53.bin).
+The helper downloads the selected version and verifies its size and SHA-256.
 
-The Mac's USB Ethernet interface was `en8`. I started the server with:
+For cleanup, start recovery with `--firmware 1.0.91`. After TFTP reaches 100%,
+wait about 10 seconds and unplug the router. Run recovery with 1.0.91 again,
+wait for 100%, wait about 20 seconds, and unplug once more. Then start recovery
+with `--firmware 1.0.53` and let installation finish. If the LED turns steady
+yellow immediately after the 1.0.53 transfer, cleanup likely did not finish;
+repeat the 1.0.91 cycles. See [README.en.md](README.en.md) for commands, OS
+instructions, and caveats.
 
-```sh
-sudo /usr/bin/python3 recover.py --interface en8
-```
+The earlier log excerpts show a complete 1.0.53 TFTP transfer, but 100% alone
+does not prove the image was installed. MAC addresses in the published logs
+are redacted. Interrupting power during a flash write can make the router
+unbootable and require UART or a flash programmer.
 
-The script added `192.168.31.100` temporarily and started DHCP/TFTP.
-I powered the router on while holding Reset and released it when the yellow
-LED started blinking. The log showed `DHCP DISCOVER`, `TFTP RRQ`, and transfer
-progress to `TFTP transfer complete`.
-
-The first completed TFTP transfer did **not** change the version: the router
-still had 1.0.91. In later attempts the transfer finished while the status
-LED remained off. I interrupted power several times in that state, roughly
-10 seconds after one completed transfer and about 20 seconds after another.
-Then I ran Reset recovery with 1.0.53 again and let the router boot. Its local
-API at `http://192.168.31.1/cgi-bin/luci/api/xqsystem/init_info` reported
-`romversion: 1.0.53` (the internal `hardware` field may report `RD18`).
-
-Those timings and the number of attempts were approximate. An unlit LED
-does not show whether the router is checking or writing flash. Cutting power
-after TFTP finishes can still leave the router unbootable and require UART
-or a flash programmer. The helper only serves the signed stock image; it
-does not write flash or bypass rollback checks. Full setup instructions are
-in [README.en.md](README.en.md), with anonymized logs in
-[LOG_EXAMPLE.md](LOG_EXAMPLE.md).
+The helper only serves Xiaomi's signed stock image; it does not write flash or
+bypass rollback checks. Full instructions and anonymized logs are in
+[README.en.md](README.en.md) and [LOG_EXAMPLE.md](LOG_EXAMPLE.md).
