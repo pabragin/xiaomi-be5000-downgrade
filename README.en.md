@@ -20,8 +20,7 @@ cleanup cycles started with that version. Both cases then use two interrupted
 report also includes LED observations and approximate timings. Interrupting a
 flash write is risky and may require UART or a flash programmer.
 
-1. This sequence describes downgrading a router that already runs **1.0.91**.
-   Prepare the computer and cable as described below, connect to the router's
+1. Prepare the computer and cable as described below, connect to the router's
    **first Ethernet port (LAN1)**, and choose one file-serving option:
    `recover.py` (macOS/Linux/Windows) or Xiaomi's official
    [MiWiFi Repair Tool](https://cdn.cnbj1.fds.api.mi-img.com/xiaoqiang/tools/MIWIFIRepairTool.x86.zip)
