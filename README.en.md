@@ -10,9 +10,8 @@ only. Python 3.8 or newer is required.
 
 ## Quick downgrade sequence
 
-This sequence follows a BE5000 owner's reported 1.0.88 → 1.0.53 downgrade on
-[4PDA](https://4pda.to/forum/index.php?showtopic=1088946&st=2240) and the
-[detailed BE5000 method report](https://www.right.com.cn/forum/thread-8470335-1-1.html).
+This sequence follows a BE5000 owner's reported 1.0.88 → 1.0.53 downgrade and
+the [detailed BE5000 method report](https://www.right.com.cn/forum/thread-8470335-1-1.html).
 The original report's router was on 1.0.87, so its author first upgraded to
 1.0.91. In the case documented here, the router already ran 1.0.91, so the
 cleanup cycles started with that version. Both cases then use two interrupted
