@@ -147,10 +147,20 @@ def dhcp_server(interface, expected_mac, filename):
             kind = options.get(53, b"\0")[:1]
             mac = ":".join(f"{byte:02x}" for byte in data[28:34])
             bootfile = data[108:236].split(b"\0", 1)[0]
+            vendor = options.get(60, b"").decode("ascii", "replace")
             if recovery_mac is None:
-                if bootfile != b"tclinux.bin":
-                    log(f"DHCP from {mac} without BE5000 recovery bootfile; ignored")
+                # The bootloader names "tclinux.bin" when recovery was started
+                # with Reset; with no firmware left on the flash it asks with an
+                # empty file name. A running firmware (udhcpc) also leaves it
+                # empty but announces itself in the vendor class.
+                if vendor.startswith("udhcp"):
+                    log(f"DHCP from {mac} comes from a running firmware ({vendor}), not from recovery; ignored (hold Reset while powering on)")
                     continue
+                if bootfile not in (b"tclinux.bin", b""):
+                    log(f"DHCP from {mac} asks for {bootfile!r} (vendor {vendor!r}), not a BE5000 recovery request; ignored (use --router-mac {mac} to serve it anyway)")
+                    continue
+                if not bootfile:
+                    log(f"DHCP from {mac} without a bootfile name (vendor {vendor!r}): the bootloader asks this way when the flash holds no firmware; serving it")
                 recovery_mac = mac
                 log(f"Recovery client locked to {recovery_mac}")
             elif mac != recovery_mac:
