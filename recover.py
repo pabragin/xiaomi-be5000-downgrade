@@ -62,8 +62,8 @@ def bind_interface(sock, interface):
 
 def send_dhcp_reply(sock, interface, packet, destination):
     if SYSTEM == "Windows":
-        # Windows Python sockets have no sendmsg(). Use the isolated Ethernet
-        # link with a static SERVER_IP so the route selects that interface.
+        # Windows Python sockets have no sendmsg(); the socket is bound to
+        # SERVER_IP, so the broadcast leaves through that adapter.
         sock.sendto(packet, (destination, 68))
         return
     packet_info = struct.pack(
@@ -131,10 +131,19 @@ def dhcp_server(interface, expected_mac, filename):
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     bind_interface(sock, interface)
-    sock.bind(("0.0.0.0", 67))
+    if SYSTEM == "Windows":
+        # Windows has no SO_BINDTODEVICE, but unlike Linux a socket bound to
+        # an interface address still receives broadcasts arriving on that
+        # interface, and its own broadcasts leave through it (KB 156317).
+        # Bound to 0.0.0.0 the OFFER follows the default route and may go
+        # out via Wi-Fi or a virtual adapter instead of the router cable.
+        sock.bind((SERVER_IP, 67))
+    else:
+        sock.bind(("0.0.0.0", 67))
     sock.settimeout(1)
     log(f"DHCP listening on {interface}:67; offering {CLIENT_IP}")
     recovery_mac = expected_mac
+    not_recovery = set()
     try:
         while not STOP.is_set():
             try:
@@ -147,15 +156,23 @@ def dhcp_server(interface, expected_mac, filename):
             kind = options.get(53, b"\0")[:1]
             mac = ":".join(f"{byte:02x}" for byte in data[28:34])
             bootfile = data[108:236].split(b"\0", 1)[0]
-            vendor = options.get(60, b"").decode("ascii", "replace")
+            vendor = options.get(60, b"").decode("ascii", "replace").rstrip("\0")
+            # A running firmware also sends DHCP without a bootfile name but
+            # announces itself in the vendor class: the stock firmware's
+            # wan_detect probes the LAN ports for an uplink as "MSFT 5.0" and
+            # never fetches anything over TFTP; udhcpc is a WAN client. Such a
+            # router has booted normally and is not in recovery, whatever
+            # --router-mac says.
+            if vendor.startswith("MSFT") or vendor.startswith("udhcp"):
+                if mac not in not_recovery:
+                    not_recovery.add(mac)
+                    source_name = "the stock firmware probing LAN ports for an uplink (wan_detect)" if vendor.startswith("MSFT") else f"a running firmware ({vendor})"
+                    log(f"DHCP from {mac} comes from {source_name}, not from recovery: the router booted normally. Power it off, hold Reset, power on, release Reset when the LED blinks yellow; ignored")
+                continue
             if recovery_mac is None:
                 # The bootloader names "tclinux.bin" when recovery was started
                 # with Reset; with no firmware left on the flash it asks with an
-                # empty file name. A running firmware (udhcpc) also leaves it
-                # empty but announces itself in the vendor class.
-                if vendor.startswith("udhcp"):
-                    log(f"DHCP from {mac} comes from a running firmware ({vendor}), not from recovery; ignored (hold Reset while powering on)")
-                    continue
+                # empty file name.
                 if bootfile not in (b"tclinux.bin", b""):
                     log(f"DHCP from {mac} asks for {bootfile!r} (vendor {vendor!r}), not a BE5000 recovery request; ignored (use --router-mac {mac} to serve it anyway)")
                     continue
